@@ -170,7 +170,7 @@ static int dhd_msgbuf_set_ioctl(dhd_pub_t *dhd, int ifidx, uint cmd,
 	void *buf, uint len, uint8 action);
 static int dhdmsgbuf_cmplt(dhd_pub_t *dhd, uint32 id, uint32 len, void* buf, void* retbuf);
 
-static void dhd_msgbuf_rxbuf_post(dhd_pub_t *dhd);
+static int dhd_msgbuf_rxbuf_post(dhd_pub_t *dhd);
 static int dhd_prot_rxbufpost(dhd_pub_t *dhd, uint16 count);
 static void dhd_prot_return_rxbuf(dhd_pub_t *dhd, uint16 rxcnt);
 static void dhd_prot_rxcmplt_process(dhd_pub_t *dhd, void* buf, uint16 msglen);
@@ -218,8 +218,8 @@ static void BCMFASTPATH dhd_rxchain_commit(dhd_pub_t *dhd);
 #endif /* DHD_RX_CHAINING */
 
 static uint16 dhd_msgbuf_rxbuf_post_ctrlpath(dhd_pub_t *dhd, bool event_buf, uint32 max_to_post);
-static void dhd_msgbuf_rxbuf_post_ioctlresp_bufs(dhd_pub_t *pub);
-static void dhd_msgbuf_rxbuf_post_event_bufs(dhd_pub_t *pub);
+static int dhd_msgbuf_rxbuf_post_ioctlresp_bufs(dhd_pub_t *pub);
+static int dhd_msgbuf_rxbuf_post_event_bufs(dhd_pub_t *pub);
 
 static void dhd_prot_ring_detach(dhd_pub_t *dhd, msgbuf_ring_t * ring);
 static void dhd_ring_init(dhd_pub_t *dhd, msgbuf_ring_t *ring);
@@ -1058,6 +1058,10 @@ int dhd_sync_with_dongle(dhd_pub_t *dhd)
 
 	DHD_TRACE(("%s: Enter\n", __FUNCTION__));
 
+	/* Post event buffer after shim layer is attached */
+	ret = dhd_msgbuf_rxbuf_post_event_bufs(dhd);
+
+
 	/* Get the device rev info */
 	memset(&revinfo, 0, sizeof(revinfo));
 	ret = dhd_wl_ioctl_cmd(dhd, WLC_GET_REVINFO, &revinfo, sizeof(revinfo), FALSE, 0);
@@ -1082,6 +1086,7 @@ done:
 */
 int dhd_prot_init(dhd_pub_t *dhd)
 {
+	int ret = 0;
 	dhd_prot_t *prot = dhd->prot;
 
 	/* Max pkts in ring */
@@ -1157,11 +1162,10 @@ int dhd_prot_init(dhd_pub_t *dhd)
 
 	}
 
-	dhd_msgbuf_rxbuf_post(dhd);
-	dhd_msgbuf_rxbuf_post_ioctlresp_bufs(dhd);
-	dhd_msgbuf_rxbuf_post_event_bufs(dhd);
+	ret = dhd_msgbuf_rxbuf_post(dhd);
+	ret = dhd_msgbuf_rxbuf_post_ioctlresp_bufs(dhd);
 
-	return BCME_OK;
+	return ret;
 }
 
 #define DHD_DBG_SHOW_METADATA	0
@@ -1271,7 +1275,7 @@ dhd_prot_packet_get(dhd_pub_t *dhd, uint32 pktid, uint8 buf_type)
 	return PKTBUF;
 }
 
-static void BCMFASTPATH
+static int BCMFASTPATH
 dhd_msgbuf_rxbuf_post(dhd_pub_t *dhd)
 {
 	dhd_prot_t *prot = dhd->prot;
@@ -1306,7 +1310,7 @@ dhd_msgbuf_rxbuf_post(dhd_pub_t *dhd)
 		}
 	}
 
-	return;
+	return 0;
 }
 
 /* Post count no of rx buffers down to dongle */
@@ -1545,39 +1549,26 @@ dhd_msgbuf_rxbuf_post_ctrlpath(dhd_pub_t *dhd, bool event_buf, uint32 max_to_pos
 	return (uint16)i;
 }
 
-static void
+static int
 dhd_msgbuf_rxbuf_post_ioctlresp_bufs(dhd_pub_t *dhd)
 {
 	dhd_prot_t *prot = dhd->prot;
-	int max_to_post;
+	uint16 retcnt = 0;
 
 	DHD_INFO(("ioctl resp buf post\n"));
-	max_to_post = prot->max_ioctlrespbufpost - prot->cur_ioctlresp_bufs_posted;
-	if (max_to_post <= 0) {
-		DHD_INFO(("%s: Cannot post more than maximum ioctl response buffers\n",
-			__FUNCTION__));
-		return;
-	}
-	prot->cur_ioctlresp_bufs_posted +=
-		dhd_msgbuf_rxbuf_post_ctrlpath(dhd, FALSE, max_to_post);
-	return;
+	retcnt = dhd_msgbuf_rxbuf_post_ctrlpath(dhd, FALSE,
+		prot->max_ioctlrespbufpost - prot->cur_ioctlresp_bufs_posted);
+	prot->cur_ioctlresp_bufs_posted += retcnt;
+	return 0;
 }
 
-static void
+static int
 dhd_msgbuf_rxbuf_post_event_bufs(dhd_pub_t *dhd)
 {
 	dhd_prot_t *prot = dhd->prot;
-	int max_to_post;
-
-	max_to_post = prot->max_eventbufpost - prot->cur_event_bufs_posted;
-	if (max_to_post <= 0) {
-		DHD_INFO(("%s: Cannot post more than maximum event buffers\n",
-			__FUNCTION__));
-		return;
-	}
-	prot->cur_event_bufs_posted +=
-		dhd_msgbuf_rxbuf_post_ctrlpath(dhd, TRUE, max_to_post);
-	return;
+	prot->cur_event_bufs_posted += dhd_msgbuf_rxbuf_post_ctrlpath(dhd, TRUE,
+		prot->max_eventbufpost - prot->cur_event_bufs_posted);
+	return 0;
 }
 
 int BCMFASTPATH
