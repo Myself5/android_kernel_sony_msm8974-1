@@ -143,10 +143,12 @@ dbg_ring_poll_worker(struct work_struct *work)
 	}
 	MFREE(dhdp->osh, buf, buflen);
 
+	dhd_dbg_get_ring_status(dhdp, ring_info->ring_id, &ring_status);
+
 exit:
 	if (sched) {
 		/* retrigger the work at same interval */
-		if ((ring_status.written_bytes == ring_status.read_bytes) && (ring_info->interval)) {
+		if (ring_status.written_bytes == ring_status.read_bytes) {
 			schedule_delayed_work(d_work, ring_info->interval);
 		}
 	}
@@ -211,13 +213,11 @@ dhd_os_start_logging(dhd_pub_t *dhdp, char *ring_name, int log_level,
 		ring_info->tsoffset -= ms;
 	}
 	if (time_intval == 0 || log_level == 0) {
-		ring_info->interval = 0;
-		cancel_delayed_work_sync(&ring_info->work);
+		ring_info->interval = msecs_to_jiffies(DEFAULT_INTERVAL * MSEC_PER_SEC);
 	} else {
 		ring_info->interval = msecs_to_jiffies(time_intval * MSEC_PER_SEC);
-		cancel_delayed_work_sync(&ring_info->work);
-		schedule_delayed_work(&ring_info->work, ring_info->interval);
 	}
+	schedule_delayed_work(&ring_info->work, ring_info->interval);
 	return ret;
 }
 
@@ -437,8 +437,11 @@ dhd_os_dbg_pullreq(void *os_priv, int ring_id)
 	linux_dbgring_info_t *ring_info;
 
 	ring_info = &((linux_dbgring_info_t *)os_priv)[ring_id];
-	cancel_delayed_work(&ring_info->work);
-	schedule_delayed_work(&ring_info->work, 0);
+	if (ring_info->interval != 0) {
+		if (cancel_delayed_work_sync(&ring_info->work)) {
+			schedule_delayed_work(&ring_info->work, 0);
+		}
+	}
 }
 
 int
