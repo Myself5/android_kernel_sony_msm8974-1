@@ -543,7 +543,6 @@ typedef struct sbpcieregs {
 
 /* enumeration Core regs */
 #define PCIH2D_MailBox  0x140
-#define PCIH2D_DB1 0x144
 #define PCID2H_MailBox  0x148
 #define PCIMailBoxInt	0x48
 #define PCIMailBoxMask	0x4C
