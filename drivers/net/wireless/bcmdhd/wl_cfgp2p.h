@@ -74,7 +74,7 @@ struct p2p_saved_ie {
 };
 
 struct p2p_bss {
-	s32 bssidx;
+	u32 bssidx;
 	struct net_device *dev;
 	struct p2p_saved_ie saved_ie;
 	void *private_data;
