@@ -88,9 +88,9 @@
 
 #define ENTRY_OVERHEAD strlen("bssid=\nssid=\nfreq=\nlevel=\nage=\ndist=\ndistSd=\n====")
 #define TIME_MIN_DIFF 5
-static wlc_ssid_ext_t * dhd_pno_get_legacy_pno_ssid(dhd_pub_t *dhd,
- dhd_pno_status_info_t *pno_state);
 #ifdef GSCAN_SUPPORT
+static wlc_ssid_t * dhd_pno_get_legacy_pno_ssid(dhd_pub_t *dhd,
+ dhd_pno_status_info_t *pno_state);
 static wl_pfn_gscan_channel_bucket_t *
 dhd_pno_gscan_create_channel_list(dhd_pub_t *dhd, dhd_pno_status_info_t *pno_state,
 uint16 *chan_list, uint32 *num_buckets, uint32 *num_buckets_to_fw);
@@ -431,7 +431,7 @@ exit:
 	return err;
 }
 static int
-_dhd_pno_add_ssid(dhd_pub_t *dhd, wlc_ssid_ext_t* ssids_list, int nssid)
+_dhd_pno_add_ssid(dhd_pub_t *dhd, wlc_ssid_t* ssids_list, int nssid)
 {
 	int err = BCME_OK;
 	int i = 0;
@@ -444,8 +444,8 @@ _dhd_pno_add_ssid(dhd_pub_t *dhd, wlc_ssid_ext_t* ssids_list, int nssid)
 	{
 		int j;
 		for (j = 0; j < nssid; j++) {
-			DHD_PNO(("%d: scan  for  %s size = %d hidden = %d\n", j,
-				ssids_list[j].SSID, ssids_list[j].SSID_len, ssids_list[j].hidden));
+			DHD_PNO(("%d: scan  for  %s size = %d\n", j,
+				ssids_list[j].SSID, ssids_list[j].SSID_len));
 		}
 	}
 	/* Check for broadcast ssid */
@@ -463,10 +463,7 @@ _dhd_pno_add_ssid(dhd_pub_t *dhd, wlc_ssid_ext_t* ssids_list, int nssid)
 		pfn_element.wpa_auth = htod32(WPA_AUTH_PFN_ANY);
 		pfn_element.wsec = htod32(0);
 		pfn_element.infra = htod32(1);
-		if (ssids_list[i].hidden)
-			pfn_element.flags = htod32(ENABLE << WL_PFN_HIDDEN_BIT);
-		else
-			pfn_element.flags = 0;
+		pfn_element.flags = htod32(ENABLE << WL_PFN_HIDDEN_BIT);
 		memcpy((char *)pfn_element.ssid.SSID, ssids_list[i].SSID,
 			ssids_list[i].SSID_len);
 		pfn_element.ssid.SSID_len = ssids_list[i].SSID_len;
@@ -989,7 +986,8 @@ dhd_pno_stop_for_ssid(dhd_pub_t *dhd)
 		}
 	}
 exit:
-	kfree(p_pfn_bssid);
+	if (p_pfn_bssid)
+		kfree(p_pfn_bssid);
 	return err;
 }
 
@@ -1002,72 +1000,11 @@ dhd_pno_enable(dhd_pub_t *dhd, int enable)
 	return (_dhd_pno_enable(dhd, enable));
 }
 
-static wlc_ssid_ext_t * dhd_pno_get_legacy_pno_ssid(dhd_pub_t *dhd,
-            dhd_pno_status_info_t *pno_state)
-{
-	int err = BCME_OK;
-	int i;
-	struct dhd_pno_ssid *iter, *next;
-	dhd_pno_params_t	*_params1 = &pno_state->pno_params_arr[INDEX_OF_LEGACY_PARAMS];
-	wlc_ssid_ext_t *p_ssid_list;
-
-	p_ssid_list = kzalloc(sizeof(wlc_ssid_ext_t) *
-	                   _params1->params_legacy.nssid, GFP_KERNEL);
-	if (p_ssid_list == NULL) {
-		DHD_ERROR(("%s : failed to allocate wlc_ssid_ext_t array (count: %d)",
-			__FUNCTION__, _params1->params_legacy.nssid));
-		err = BCME_ERROR;
-		pno_state->pno_mode &= ~DHD_PNO_LEGACY_MODE;
-		goto exit;
-	}
-	i = 0;
-	/* convert dhd_pno_ssid to wlc_ssid_ext_t */
-	list_for_each_entry_safe(iter, next, &_params1->params_legacy.ssid_list, list) {
-		p_ssid_list[i].SSID_len = iter->SSID_len;
-		p_ssid_list[i].hidden = iter->hidden;
-		memcpy(p_ssid_list[i].SSID, iter->SSID, p_ssid_list[i].SSID_len);
-		i++;
-	}
-exit:
-	return p_ssid_list;
-}
-
-static int
-dhd_pno_add_to_ssid_list(dhd_pno_params_t *params, wlc_ssid_ext_t *ssid_list,
-    int nssid)
-{
-	int ret = 0;
-	int i;
-	struct dhd_pno_ssid *_pno_ssid;
-
-	for (i = 0; i < nssid; i++) {
-		if (ssid_list[i].SSID_len > DOT11_MAX_SSID_LEN) {
-			DHD_ERROR(("%s : Invalid SSID length %d\n",
-				__FUNCTION__, ssid_list[i].SSID_len));
-			ret = BCME_ERROR;
-			goto exit;
-		}
-		_pno_ssid = kzalloc(sizeof(struct dhd_pno_ssid), GFP_KERNEL);
-		if (_pno_ssid == NULL) {
-			DHD_ERROR(("%s : failed to allocate struct dhd_pno_ssid\n",
-				__FUNCTION__));
-			ret = BCME_ERROR;
-			goto exit;
-		}
-		_pno_ssid->SSID_len = ssid_list[i].SSID_len;
-		_pno_ssid->hidden = ssid_list[i].hidden;
-		memcpy(_pno_ssid->SSID, ssid_list[i].SSID, _pno_ssid->SSID_len);
-		list_add_tail(&_pno_ssid->list, &params->params_legacy.ssid_list);
-	}
-
-exit:
-	return ret;
-}
-
 int
-dhd_pno_set_for_ssid(dhd_pub_t *dhd, wlc_ssid_ext_t* ssid_list, int nssid,
+dhd_pno_set_for_ssid(dhd_pub_t *dhd, wlc_ssid_t* ssid_list, int nssid,
 	uint16  scan_fr, int pno_repeat, int pno_freq_expo_max, uint16 *channel_list, int nchan)
 {
+	struct dhd_pno_ssid *_pno_ssid;
 	dhd_pno_params_t *_params;
 	dhd_pno_params_t *_params2;
 	dhd_pno_status_info_t *_pno_state;
@@ -1082,7 +1019,7 @@ dhd_pno_set_for_ssid(dhd_pub_t *dhd, wlc_ssid_ext_t* ssid_list, int nssid,
 
 	if (!dhd_support_sta_mode(dhd)) {
 		err = BCME_BADOPTION;
-		goto exit_no_clear;
+		goto exit;
 	}
 	DHD_PNO(("%s enter : scan_fr :%d, pno_repeat :%d,"
 			"pno_freq_expo_max: %d, nchan :%d\n", __FUNCTION__,
@@ -1102,7 +1039,7 @@ dhd_pno_set_for_ssid(dhd_pub_t *dhd, wlc_ssid_ext_t* ssid_list, int nssid,
 		if (err < 0) {
 			DHD_ERROR(("%s : failed to stop legacy PNO (err %d)\n",
 				__FUNCTION__, err));
-			goto exit_no_clear;
+			goto exit;
 		}
 	}
 	_pno_state->pno_mode |= DHD_PNO_LEGACY_MODE;
@@ -1110,7 +1047,13 @@ dhd_pno_set_for_ssid(dhd_pub_t *dhd, wlc_ssid_ext_t* ssid_list, int nssid,
 	if (err < 0) {
 		DHD_ERROR(("%s : failed to reinitialize profile (err %d)\n",
 			__FUNCTION__, err));
-		goto exit_no_clear;
+		goto exit;
+	}
+	if (nssid > MAX_PFN_LIST_COUNT) {
+		err = BCME_RANGE;
+		DHD_ERROR(("%s : Excessive number of ssids programmed %d\n",
+			__FUNCTION__, nssid));
+		goto exit;
 	}
 	memset(_chan_list, 0, sizeof(_chan_list));
 	tot_nchan = nchan;
@@ -1127,7 +1070,7 @@ dhd_pno_set_for_ssid(dhd_pub_t *dhd, wlc_ssid_ext_t* ssid_list, int nssid,
 		err = _dhd_pno_enable(dhd, PNO_OFF);
 		if (err < 0) {
 			DHD_ERROR(("%s : failed to disable PNO\n", __FUNCTION__));
-			goto exit_no_clear;
+			goto exit;
 		}
 		/* restore the previous mode */
 		_pno_state->pno_mode = mode;
@@ -1143,7 +1086,7 @@ dhd_pno_set_for_ssid(dhd_pub_t *dhd, wlc_ssid_ext_t* ssid_list, int nssid,
 					DHD_ERROR(("%s : failed to merge channel list"
 					" between legacy and batch\n",
 						__FUNCTION__));
-					goto exit_no_clear;
+					goto exit;
 				}
 			}  else {
 				DHD_PNO(("superset channel will use"
@@ -1160,7 +1103,7 @@ dhd_pno_set_for_ssid(dhd_pub_t *dhd, wlc_ssid_ext_t* ssid_list, int nssid,
 					DHD_ERROR(("%s : failed to merge channel list"
 					" between legacy and hotlist\n",
 						__FUNCTION__));
-					goto exit_no_clear;
+					goto exit;
 				}
 			}
 		}
@@ -1174,10 +1117,24 @@ dhd_pno_set_for_ssid(dhd_pub_t *dhd, wlc_ssid_ext_t* ssid_list, int nssid,
 #ifdef GSCAN_SUPPORT
 	/* dhd_pno_initiate_gscan_request will handle simultaneous Legacy PNO and GSCAN */
 	if (_pno_state->pno_mode & DHD_PNO_GSCAN_MODE) {
-		if (dhd_pno_add_to_ssid_list(_params, ssid_list, nssid) < 0) {
-			err = BCME_ERROR;
-			goto exit;
+		for (i = 0; i < nssid; i++) {
+			if (ssid_list[i].SSID_len > DOT11_MAX_SSID_LEN) {
+				DHD_ERROR(("%s : Invalid SSID length %d\n",
+					__FUNCTION__, ssid_list[i].SSID_len));
+				goto exit;
+			}
+			_pno_ssid = kzalloc(sizeof(struct dhd_pno_ssid), GFP_KERNEL);
+			if (_pno_ssid == NULL) {
+				DHD_ERROR(("%s : failed to allocate struct dhd_pno_ssid\n",
+					__FUNCTION__));
+				goto exit;
+			}
+			_pno_ssid->SSID_len = ssid_list[i].SSID_len;
+			memcpy(_pno_ssid->SSID, ssid_list[i].SSID, _pno_ssid->SSID_len);
+			list_add_tail(&_pno_ssid->list, &_params->params_legacy.ssid_list);
+
 		}
+
 		DHD_PNO(("GSCAN mode is ON! Will restart GSCAN+Legacy PNO\n"));
 		err = dhd_pno_initiate_gscan_request(dhd, 1, 0);
 		goto exit;
@@ -1191,9 +1148,22 @@ dhd_pno_set_for_ssid(dhd_pub_t *dhd, wlc_ssid_ext_t* ssid_list, int nssid,
 		DHD_ERROR(("failed to add ssid list(err %d), %d in firmware\n", err, nssid));
 		goto exit;
 	}
-	if (dhd_pno_add_to_ssid_list(_params, ssid_list, nssid) < 0) {
-		err = BCME_ERROR;
-		goto exit;
+	for (i = 0; i < nssid; i++) {
+		if (ssid_list[i].SSID_len > DOT11_MAX_SSID_LEN) {
+			DHD_ERROR(("%s : Invalid SSID length %d\n",
+				__FUNCTION__, ssid_list[i].SSID_len));
+			goto exit;
+		}
+		_pno_ssid = kzalloc(sizeof(struct dhd_pno_ssid), GFP_KERNEL);
+		if (_pno_ssid == NULL) {
+			DHD_ERROR(("%s : failed to allocate struct dhd_pno_ssid\n",
+				__FUNCTION__));
+			goto exit;
+		}
+		_pno_ssid->SSID_len = ssid_list[i].SSID_len;
+		memcpy(_pno_ssid->SSID, ssid_list[i].SSID, _pno_ssid->SSID_len);
+		list_add_tail(&_pno_ssid->list, &_params->params_legacy.ssid_list);
+
 	}
 	if (tot_nchan > 0) {
 		if ((err = _dhd_pno_cfg(dhd, _chan_list, tot_nchan)) < 0) {
@@ -1207,9 +1177,6 @@ dhd_pno_set_for_ssid(dhd_pub_t *dhd, wlc_ssid_ext_t* ssid_list, int nssid,
 			DHD_ERROR(("%s : failed to enable PNO\n", __FUNCTION__));
 	}
 exit:
-	if (err < 0)
-		_dhd_pno_reinitialize_prof(dhd, _params, DHD_PNO_LEGACY_MODE);
-exit_no_clear:
 	/* clear mode in case of error */
 	if (err < 0)
 		_pno_state->pno_mode &= ~DHD_PNO_LEGACY_MODE;
@@ -1222,10 +1189,11 @@ dhd_pno_set_for_batch(dhd_pub_t *dhd, struct dhd_pno_batch_params *batch_params)
 	uint16 _chan_list[WL_NUMCHANNELS];
 	int rem_nchan = 0, tot_nchan = 0;
 	int mode = 0, mscan = 0;
+	int i = 0;
 	dhd_pno_params_t *_params;
 	dhd_pno_params_t *_params2;
 	dhd_pno_status_info_t *_pno_state;
-	wlc_ssid_ext_t *p_ssid_list = NULL;
+	wlc_ssid_t *p_ssid_list = NULL;
 	NULL_CHECK(dhd, "dhd is NULL", err);
 	NULL_CHECK(dhd->pno_state, "pno_state is NULL", err);
 	NULL_CHECK(batch_params, "batch_params is NULL", err);
@@ -1295,6 +1263,7 @@ dhd_pno_set_for_batch(dhd_pub_t *dhd, struct dhd_pno_batch_params *batch_params)
 		tot_nchan = _params->params_batch.nchan;
 	}
 	if (_pno_state->pno_mode & DHD_PNO_LEGACY_MODE) {
+		struct dhd_pno_ssid *iter, *next;
 		DHD_PNO(("PNO SSID is on progress in firmware\n"));
 		/* store current pno_mode before disabling pno */
 		mode = _pno_state->pno_mode;
@@ -1321,11 +1290,21 @@ dhd_pno_set_for_batch(dhd_pub_t *dhd, struct dhd_pno_batch_params *batch_params)
 		} else {
 			DHD_PNO(("superset channel will use all channels in firmware\n"));
 		}
-		p_ssid_list = dhd_pno_get_legacy_pno_ssid(dhd, _pno_state);
-		if (!p_ssid_list) {
-			err = BCME_NOMEM;
-			DHD_ERROR(("failed to get Legacy PNO SSID list\n"));
+		p_ssid_list = kzalloc(sizeof(wlc_ssid_t) *
+							_params2->params_legacy.nssid, GFP_KERNEL);
+		if (p_ssid_list == NULL) {
+			DHD_ERROR(("%s : failed to allocate wlc_ssid_t array (count: %d)",
+				__FUNCTION__, _params2->params_legacy.nssid));
+			err = BCME_ERROR;
+			_pno_state->pno_mode &= ~DHD_PNO_LEGACY_MODE;
 			goto exit;
+		}
+		i = 0;
+		/* convert dhd_pno_ssid to dhd_pno_ssid */
+		list_for_each_entry_safe(iter, next, &_params2->params_legacy.ssid_list, list) {
+			p_ssid_list[i].SSID_len = iter->SSID_len;
+			memcpy(p_ssid_list[i].SSID, iter->SSID, p_ssid_list[i].SSID_len);
+			i++;
 		}
 		if ((err = _dhd_pno_add_ssid(dhd, p_ssid_list,
 			_params2->params_legacy.nssid)) < 0) {
@@ -1360,7 +1339,8 @@ exit:
 		/* return #max scan firmware can do */
 		err = mscan;
 	}
-	kfree(p_ssid_list);
+	if (p_ssid_list)
+		kfree(p_ssid_list);
 	return err;
 }
 
@@ -1800,7 +1780,7 @@ dhd_pno_set_for_gscan(dhd_pub_t *dhd, struct dhd_pno_gscan_params *gscan_params)
 	wl_pfn_gscan_cfg_t *pfn_gscan_cfg_t = NULL;
 	wl_pfn_significant_bssid_t *p_pfn_significant_bssid = NULL;
 	wl_pfn_bssid_t *p_pfn_bssid = NULL;
-	wlc_ssid_ext_t *pssid_list = NULL;
+	wlc_ssid_t *pssid_list = NULL;
 	dhd_pno_params_t	*params_legacy;
 	dhd_pno_params_t	*_params;
 
@@ -1851,7 +1831,7 @@ dhd_pno_set_for_gscan(dhd_pub_t *dhd, struct dhd_pno_gscan_params *gscan_params)
 
 		if (!pssid_list) {
 			err = BCME_NOMEM;
-			DHD_ERROR(("failed to get Legacy PNO SSID list\n"));
+			DHD_ERROR(("failed to reprogram legacy PNO\n"));
 			goto exit;
 		}
 
@@ -1937,7 +1917,7 @@ dhd_pno_set_for_gscan(dhd_pub_t *dhd, struct dhd_pno_gscan_params *gscan_params)
 			goto exit;
 		}
 		i = 0;
-		/* convert dhd_pno_significant_bssid_t to wl_pfn_significant_bssid_t */
+		/* convert dhd_pno_ssid to wlc_ssid_t */
 		list_for_each_entry_safe(iter, next, &gscan_params->significant_bssid_list, list) {
 			p_pfn_significant_bssid[i].rssi_low_threshold = iter->rssi_low_threshold;
 			p_pfn_significant_bssid[i].rssi_high_threshold = iter->rssi_high_threshold;
@@ -2004,6 +1984,38 @@ exit:
 		MFREE(dhd->osh, ch_bucket,
 		(tot_num_buckets * sizeof(wl_pfn_gscan_channel_bucket_t)));
 	return err;
+
+}
+
+static wlc_ssid_t * dhd_pno_get_legacy_pno_ssid(dhd_pub_t *dhd,
+            dhd_pno_status_info_t *pno_state)
+{
+	int err = BCME_OK;
+	int i;
+	struct dhd_pno_ssid *iter, *next;
+	dhd_pno_params_t	*_params1 = &pno_state->pno_params_arr[INDEX_OF_LEGACY_PARAMS];
+	wlc_ssid_t *p_ssid_list;
+
+	DHD_PNO(("PNO SSID was on progress in firmware when gscan was set\n"));
+
+	p_ssid_list = kzalloc(sizeof(wlc_ssid_t) *
+	                   _params1->params_legacy.nssid, GFP_KERNEL);
+	if (p_ssid_list == NULL) {
+		DHD_ERROR(("%s : failed to allocate wlc_ssid_t array (count: %d)",
+			__FUNCTION__, _params1->params_legacy.nssid));
+		err = BCME_ERROR;
+		pno_state->pno_mode &= ~DHD_PNO_LEGACY_MODE;
+		goto exit;
+	}
+	i = 0;
+	/* convert dhd_pno_ssid to wlc_ssid_t */
+	list_for_each_entry_safe(iter, next, &_params1->params_legacy.ssid_list, list) {
+		p_ssid_list[i].SSID_len = iter->SSID_len;
+		memcpy(p_ssid_list[i].SSID, iter->SSID, p_ssid_list[i].SSID_len);
+		i++;
+	}
+exit:
+	return p_ssid_list;
 
 }
 
@@ -2257,7 +2269,7 @@ static int  dhd_pno_stop_for_gscan(dhd_pub_t *dhd)
 	int err = BCME_OK;
 	int mode;
 	dhd_pno_status_info_t *_pno_state;
-	wlc_ssid_ext_t *pssid_list = NULL;
+	wlc_ssid_t *pssid_list = NULL;
 
 	_pno_state = PNO_GET_PNOSTATE(dhd);
 	DHD_PNO(("%s enter\n", __FUNCTION__));
@@ -2297,11 +2309,10 @@ static int  dhd_pno_stop_for_gscan(dhd_pub_t *dhd)
 		pssid_list = dhd_pno_get_legacy_pno_ssid(dhd, _pno_state);
 		if (!pssid_list) {
 			err = BCME_NOMEM;
-			DHD_ERROR(("failed to get Legacy PNO SSID list\n"));
+			DHD_ERROR(("failed to get Leacy PNO SSIDs\n"));
 			goto exit;
 		}
 
-		DHD_PNO(("Restarting Legacy PNO SSID scan...\n"));
 		err = dhd_pno_set_for_ssid(dhd, pssid_list, params_legacy->nssid,
 			params_legacy->scan_fr, params_legacy->pno_repeat,
 			params_legacy->pno_freq_expo_max, params_legacy->chan_list,
@@ -2983,7 +2994,7 @@ dhd_pno_stop_for_batch(dhd_pub_t *dhd)
 	dhd_pno_status_info_t *_pno_state;
 	dhd_pno_params_t *_params;
 	wl_pfn_bssid_t *p_pfn_bssid = NULL;
-	wlc_ssid_ext_t *p_ssid_list = NULL;
+	wlc_ssid_t *p_ssid_list = NULL;
 	NULL_CHECK(dhd, "dhd is NULL", err);
 	NULL_CHECK(dhd->pno_state, "pno_state is NULL", err);
 	_pno_state = PNO_GET_PNOSTATE(dhd);
@@ -3018,13 +3029,24 @@ dhd_pno_stop_for_batch(dhd_pub_t *dhd)
 		/* restart Legacy PNO if the Legacy PNO is on */
 		if (_pno_state->pno_mode & DHD_PNO_LEGACY_MODE) {
 			struct dhd_pno_legacy_params *_params_legacy;
+			struct dhd_pno_ssid *iter, *next;
 			_params_legacy =
 				&(_pno_state->pno_params_arr[INDEX_OF_LEGACY_PARAMS].params_legacy);
-			p_ssid_list = dhd_pno_get_legacy_pno_ssid(dhd, _pno_state);
-			if (!p_ssid_list) {
-				err = BCME_NOMEM;
-				DHD_ERROR(("failed to get Legacy PNO SSID list\n"));
+			p_ssid_list = kzalloc(sizeof(wlc_ssid_t) *
+				_params_legacy->nssid, GFP_KERNEL);
+			if (p_ssid_list == NULL) {
+				DHD_ERROR(("%s : failed to allocate wlc_ssid_t array (count: %d)",
+					__FUNCTION__, _params_legacy->nssid));
+				err = BCME_ERROR;
+				_pno_state->pno_mode &= ~DHD_PNO_LEGACY_MODE;
 				goto exit;
+			}
+			i = 0;
+			/* convert dhd_pno_ssid to dhd_pno_ssid */
+			list_for_each_entry_safe(iter, next, &_params_legacy->ssid_list, list) {
+				p_ssid_list[i].SSID_len = iter->SSID_len;
+				memcpy(p_ssid_list[i].SSID, iter->SSID, p_ssid_list[i].SSID_len);
+				i++;
 			}
 			err = dhd_pno_set_for_ssid(dhd, p_ssid_list, _params_legacy->nssid,
 				_params_legacy->scan_fr, _params_legacy->pno_repeat,
@@ -3235,9 +3257,10 @@ dhd_pno_stop_for_hotlist(dhd_pub_t *dhd)
 {
 	int err = BCME_OK;
 	uint32 mode = 0;
+	int i = 0;
 	dhd_pno_status_info_t *_pno_state;
 	dhd_pno_params_t *_params;
-	wlc_ssid_ext_t *p_ssid_list = NULL;
+	wlc_ssid_t *p_ssid_list = NULL;
 	NULL_CHECK(dhd, "dhd is NULL", err);
 	NULL_CHECK(dhd->pno_state, "pno_state is NULL", err);
 	_pno_state = PNO_GET_PNOSTATE(dhd);
@@ -3272,13 +3295,23 @@ dhd_pno_stop_for_hotlist(dhd_pub_t *dhd)
 		if (_pno_state->pno_mode & DHD_PNO_LEGACY_MODE) {
 			/* restart Legacy PNO Scan */
 			struct dhd_pno_legacy_params *_params_legacy;
+			struct dhd_pno_ssid *iter, *next;
 			_params_legacy =
 			&(_pno_state->pno_params_arr[INDEX_OF_LEGACY_PARAMS].params_legacy);
-			p_ssid_list = dhd_pno_get_legacy_pno_ssid(dhd, _pno_state);
-			if (!p_ssid_list) {
-				err = BCME_NOMEM;
-				DHD_ERROR(("failed to get Legacy PNO SSID list\n"));
+			p_ssid_list =
+			kzalloc(sizeof(wlc_ssid_t) * _params_legacy->nssid, GFP_KERNEL);
+			if (p_ssid_list == NULL) {
+				DHD_ERROR(("%s : failed to allocate wlc_ssid_t array (count: %d)",
+					__FUNCTION__, _params_legacy->nssid));
+				err = BCME_ERROR;
+				_pno_state->pno_mode &= ~DHD_PNO_LEGACY_MODE;
 				goto exit;
+			}
+			/* convert dhd_pno_ssid to dhd_pno_ssid */
+			list_for_each_entry_safe(iter, next, &_params_legacy->ssid_list, list) {
+				p_ssid_list[i].SSID_len = iter->SSID_len;
+				memcpy(p_ssid_list[i].SSID, iter->SSID, p_ssid_list[i].SSID_len);
+				i++;
 			}
 			err = dhd_pno_set_for_ssid(dhd, p_ssid_list, _params_legacy->nssid,
 				_params_legacy->scan_fr, _params_legacy->pno_repeat,
@@ -3311,7 +3344,8 @@ dhd_pno_stop_for_hotlist(dhd_pub_t *dhd)
 		}
 	}
 exit:
-	kfree(p_ssid_list);
+	if (p_ssid_list)
+		kfree(p_ssid_list);
 	return err;
 }
 
