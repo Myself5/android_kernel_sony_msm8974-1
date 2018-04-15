@@ -107,10 +107,8 @@ extern int dhd_change_mtu(dhd_pub_t *dhd, int new_mtu, int ifidx);
 extern int dhd_get_concurrent_capabilites(dhd_pub_t *dhd);
 #endif
 extern int dhd_socram_dump(struct dhd_bus *bus);
-#ifdef DNGL_EVENT_SUPPORT
 static void dngl_host_event_process(dhd_pub_t *dhdp, bcm_dngl_event_t *event);
 static int dngl_host_event(dhd_pub_t *dhdp, void *pktdata);
-#endif /* DNGL_EVENT_SUPPORT */
 bool ap_cfg_running = FALSE;
 bool ap_fw_loaded = FALSE;
 
@@ -1377,7 +1375,6 @@ wl_show_host_event(dhd_pub_t *dhd_pub, wl_event_msg_t *event, void *event_data,
 }
 #endif /* SHOW_EVENTS */
 
-#ifdef DNGL_EVENT_SUPPORT
 /* Check whether packet is a BRCM dngl event pkt. If it is, process event data. */
 int
 dngl_host_event(dhd_pub_t *dhdp, void *pktdata)
@@ -1497,8 +1494,6 @@ dngl_host_event_process(dhd_pub_t *dhdp, bcm_dngl_event_t *event)
 	break;
 	}
 }
-#endif /* DNGL_EVENT_SUPPORT */
-
 int wl_host_event(dhd_pub_t *dhd_pub, int *ifidx, void *pktdata,
 	wl_event_msg_t *event, void **data_ptr, void *raw_event)
 {
@@ -1510,13 +1505,10 @@ int wl_host_event(dhd_pub_t *dhd_pub, int *ifidx, void *pktdata,
 	int evlen;
 	int hostidx;
 
-#ifdef DNGL_EVENT_SUPPORT
 	/* If it is a DNGL event process it first */
 	if (dngl_host_event(dhd_pub, pktdata) == BCME_OK) {
-		/* Return error purposely to prevent DNGL event being processed as BRCM event */
-		return BCME_ERROR;
+		return BCME_OK;
 	}
-#endif /* DNGL_EVENT_SUPPORT */
 
 	if (bcmp(BRCM_OUI, &pvt_data->bcm_hdr.oui[0], DOT11_OUI_LEN)) {
 		DHD_ERROR(("%s: mismatched OUI, bailing\n", __FUNCTION__));
