@@ -112,12 +112,7 @@ DRIVER_TYPE ?= y
 # Chip dependent feature
 #########################
 
-ifneq ($(filter y, $(CONFIG_BCM4339) $(CONFIG_BCM4354) $(CONFIG_BCM4356) $(CONFIG_BCM4358)),)
-#for dts
-ifneq ($(filter y, $(CONFIG_BCM4358)),)
-  DHDCFLAGS += -DCONFIG_DTS
-endif
-
+ifneq ($(filter y, $(CONFIG_BCM4339) $(CONFIG_BCM4354) $(CONFIG_BCM4356)),)
   DHDCFLAGS += -DUSE_WL_TXBF
   DHDCFLAGS += -DUSE_WL_FRAMEBURST
   DHDCFLAGS += -DCUSTOM_DPC_CPUCORE=0
