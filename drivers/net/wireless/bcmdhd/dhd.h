@@ -432,9 +432,9 @@ typedef struct dhd_pub {
 	uint32 soc_ram_length;
 	uint32 memdump_enabled;
 	uint8 rand_mac_oui[DOT11_OUI_LEN];
-#ifdef DBG_PKT_MON
+#ifdef D11_STATUS
 	bool d11_tx_status;
-#endif /* DBG_PKT_MON */
+#endif /* D11_STATUS */
 } dhd_pub_t;
 
 typedef struct {
