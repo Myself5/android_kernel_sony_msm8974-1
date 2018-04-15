@@ -36,14 +36,8 @@
 #include <dhd_flowring.h>
 #endif
 
-#define DEFAULT_IOCTL_RESP_TIMEOUT	2000
 #ifndef IOCTL_RESP_TIMEOUT
-#ifdef BCMQT
-#define IOCTL_RESP_TIMEOUT  30000 /* In milli second */
-#else
-/* In milli second default value for Production FW */
-#define IOCTL_RESP_TIMEOUT  DEFAULT_IOCTL_RESP_TIMEOUT
-#endif /* BCMQT */
+#define IOCTL_RESP_TIMEOUT  2000  /* In milli second default value for Production FW */
 #endif /* IOCTL_RESP_TIMEOUT */
 
 #ifndef MFG_IOCTL_RESP_TIMEOUT
