@@ -868,7 +868,16 @@ osl_pktfree(osl_t *osh, void *p, bool send)
 		} else
 #endif
 		{
-			dev_kfree_skb_any(skb);
+			if (skb->destructor)
+				/* cannot kfree_skb() on hard IRQ (net/core/skbuff.c) if
+				 * destructor exists
+				 */
+				dev_kfree_skb_any(skb);
+			else
+				/* can free immediately (even in_irq()) if destructor
+				 * does not exist
+				 */
+				dev_kfree_skb(skb);
 		}
 #ifdef CTFPOOL
 next_skb:
