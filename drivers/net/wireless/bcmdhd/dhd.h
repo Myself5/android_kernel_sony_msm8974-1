@@ -371,7 +371,7 @@ typedef struct dhd_pub {
 	bool tdls_enable;
 #endif
 	struct reorder_info *reorder_bufs[WLHOST_REORDERDATA_MAXFLOWS];
-	char  fw_capabilities[WLC_IOCTL_MEDLEN];
+	char  fw_capabilities[WLC_IOCTL_SMLEN];
 	#define MAXSKBPEND 1024
 	void *skbbuf[MAXSKBPEND];
 	uint32 store_idx;
