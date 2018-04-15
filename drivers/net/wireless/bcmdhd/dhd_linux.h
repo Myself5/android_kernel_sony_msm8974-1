@@ -53,7 +53,6 @@
 
 #if !defined(CONFIG_WIFI_CONTROL_FUNC)
 #define WLAN_PLAT_NODFS_FLAG	0x01
-
 struct wifi_platform_data {
 	int (*set_power)(int val);
 	int (*set_reset)(int val);
@@ -73,7 +72,6 @@ struct wifi_platform_data {
 };
 #endif /* CONFIG_WIFI_CONTROL_FUNC */
 
-#define WLAN_PLAT_AP_FLAG	0x02
 #define DHD_REGISTRATION_TIMEOUT  12000  /* msec : allowed time to finished dhd registration */
 
 typedef struct wifi_adapter_info {
