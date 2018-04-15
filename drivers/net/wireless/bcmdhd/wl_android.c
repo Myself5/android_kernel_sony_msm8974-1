@@ -149,11 +149,7 @@ struct io_cfg {
 };
 
 typedef struct android_wifi_priv_cmd {
-#ifdef CONFIG_64BIT
-	u64 bufaddr;
-#else
-	char *bufaddr;
-#endif
+	char *buf;
 	int used_len;
 	int total_len;
 } android_wifi_priv_cmd;
@@ -1258,7 +1254,6 @@ int wl_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 #define PRIVATE_COMMAND_MAX_LEN	8192
 	int ret = 0;
 	char *command = NULL;
-	char *buf;
 	int bytes_written = 0;
 	android_wifi_priv_cmd priv_cmd;
 
@@ -1285,8 +1280,7 @@ int wl_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 		ret = -ENOMEM;
 		goto exit;
 	}
-	buf = (char *)priv_cmd.bufaddr;
-	if (copy_from_user(command, buf, priv_cmd.total_len)) {
+	if (copy_from_user(command, priv_cmd.buf, priv_cmd.total_len)) {
 		ret = -EFAULT;
 		goto exit;
 	}
@@ -1476,7 +1470,7 @@ int wl_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 			bytes_written++;
 		}
 		priv_cmd.used_len = bytes_written;
-		if (copy_to_user(buf, command, bytes_written)) {
+		if (copy_to_user(priv_cmd.buf, command, bytes_written)) {
 			DHD_ERROR(("%s: failed to copy data to user buffer\n", __FUNCTION__));
 			ret = -EFAULT;
 		}
