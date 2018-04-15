@@ -65,7 +65,6 @@ struct bcmsdh_info
 #ifdef DHD_WAKE_STATUS
 	unsigned int	total_wake_count;
 	int	pkt_wake;
-	int	wake_irq;
 #endif
 };
 
@@ -91,7 +90,6 @@ extern bool bcmsdh_intr_pending(void *sdh);
 #endif
 
 #ifdef DHD_WAKE_STATUS
-int bcmsdh_get_total_wake(bcmsdh_info_t *bcmsdh);
 int bcmsdh_set_get_wake(bcmsdh_info_t *bcmsdh, int flag);
 #endif
 
