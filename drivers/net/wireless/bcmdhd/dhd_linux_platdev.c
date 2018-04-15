@@ -36,6 +36,20 @@
 #include <dhd_bus.h>
 #include <dhd_linux.h>
 #include <wl_android.h>
+#if defined(CONFIG_WIFI_CONTROL_FUNC)
+#include <linux/wlan_plat.h>
+#endif
+
+#if !defined(CONFIG_WIFI_CONTROL_FUNC)
+struct wifi_platform_data {
+	int (*set_power)(int val);
+	int (*set_reset)(int val);
+	int (*set_carddetect)(int val);
+	void *(*mem_prealloc)(int section, unsigned long size);
+	int (*get_mac_addr)(unsigned char *buf);
+	void *(*get_country_code)(char *ccode);
+};
+#endif /* CONFIG_WIFI_CONTROL_FUNC */
 
 #define WIFI_PLAT_NAME		"bcmdhd_wlan"
 #define WIFI_PLAT_NAME2		"bcm4329_wlan"
@@ -194,8 +208,7 @@ int wifi_platform_get_mac_addr(wifi_adapter_info_t *adapter, unsigned char *buf)
 	return -EOPNOTSUPP;
 }
 
-void *wifi_platform_get_country_code(wifi_adapter_info_t *adapter, char *ccode,
-				     u32 flags)
+void *wifi_platform_get_country_code(wifi_adapter_info_t *adapter, char *ccode)
 {
 	/* get_country_code was added after 2.6.39 */
 #if	(LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 39))
@@ -207,7 +220,7 @@ void *wifi_platform_get_country_code(wifi_adapter_info_t *adapter, char *ccode,
 
 	DHD_TRACE(("%s\n", __FUNCTION__));
 	if (plat_data->get_country_code) {
-		return plat_data->get_country_code(ccode, flags);
+		return plat_data->get_country_code(ccode);
 	}
 #endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 39)) */
 

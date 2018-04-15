@@ -256,8 +256,7 @@ const struct cntry_locales_custom translate_custom_table[] = {
 *  input : ISO 3166-1 country abbreviation
 *  output: customized cspec
 */
-void get_customized_country_code(void *adapter, char *country_iso_code,
-				 wl_country_t *cspec, u32 flags)
+void get_customized_country_code(void *adapter, char *country_iso_code, wl_country_t *cspec)
 {
 #if defined(CUSTOMER_HW2) && (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 39))
 
@@ -266,8 +265,7 @@ void get_customized_country_code(void *adapter, char *country_iso_code,
 	if (!cspec)
 		return;
 
-	cloc_ptr = wifi_platform_get_country_code(adapter, country_iso_code,
-						  flags);
+	cloc_ptr = wifi_platform_get_country_code(adapter, country_iso_code);
 	if (cloc_ptr) {
 		strlcpy(cspec->ccode, cloc_ptr->custom_locale, WLC_CNTRY_BUF_SZ);
 		cspec->rev = cloc_ptr->custom_locale_rev;
