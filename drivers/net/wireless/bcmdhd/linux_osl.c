@@ -157,6 +157,7 @@ struct osl_info {
 #define OSL_PKTTAG_CLEAR(p) \
 do { \
 	struct sk_buff *s = (struct sk_buff *)(p); \
+	ASSERT(OSL_PKTTAG_SZ == 32); \
 	*(uint32 *)(&s->cb[0]) = 0; *(uint32 *)(&s->cb[4]) = 0; \
 	*(uint32 *)(&s->cb[8]) = 0; *(uint32 *)(&s->cb[12]) = 0; \
 	*(uint32 *)(&s->cb[16]) = 0; *(uint32 *)(&s->cb[20]) = 0; \
@@ -260,17 +261,19 @@ osl_attach(void *pdev, uint bustype, bool pkttag)
 	gfp_t flags;
 
 	flags = CAN_SLEEP() ? GFP_KERNEL: GFP_ATOMIC;
-	if (!(osh = kzalloc(sizeof(osl_t), flags))) {
-		DHD_WARN(0,);
+	if (!(osh = kmalloc(sizeof(osl_t), flags)))
 		return osh;
-	}
+
+	ASSERT(osh);
+
+	bzero(osh, sizeof(osl_t));
 
 	if (osl_cmn == NULL || *osl_cmn == NULL) {
-		if (!(osh->cmn = kzalloc(sizeof(osl_cmn_t), flags))) {
+		if (!(osh->cmn = kmalloc(sizeof(osl_cmn_t), flags))) {
 			kfree(osh);
 			return NULL;
 		}
-
+		bzero(osh->cmn, sizeof(osl_cmn_t));
 		if (osl_cmn)
 			*osl_cmn = osh->cmn;
 		atomic_set(&osh->cmn->malloced, 0);
@@ -285,7 +288,7 @@ osl_attach(void *pdev, uint bustype, bool pkttag)
 	atomic_add(1, &osh->cmn->refcount);
 
 	/* Check that error map has the right number of entries in it */
-	DHD_WARN(ABS(BCME_LAST) == (ARRAYSIZE(linuxbcmerrormap) - 1), kfree(osh);return NULL;);
+	ASSERT(ABS(BCME_LAST) == (ARRAYSIZE(linuxbcmerrormap) - 1));
 
 	osh->failed = 0;
 	osh->pdev = pdev;
@@ -307,7 +310,7 @@ osl_attach(void *pdev, uint bustype, bool pkttag)
 			osh->pub.mmbus = FALSE;
 			break;
 		default:
-			DHD_WARN(FALSE,);
+			ASSERT(FALSE);
 			break;
 	}
 
@@ -324,7 +327,7 @@ int osl_static_mem_init(osl_t *osh, void *adapter)
 			3, STATIC_BUF_SIZE + STATIC_BUF_TOTAL_LEN))) {
 			printk("can not alloc static buf!\n");
 			bcm_static_skb = NULL;
-			DHD_BUG(osh->magic != OS_HANDLE_MAGIC);
+			ASSERT(osh->magic == OS_HANDLE_MAGIC);
 			return -ENOMEM;
 		} else {
 			printk("alloc static buf at %p!\n", bcm_static_buf);
@@ -343,7 +346,7 @@ int osl_static_mem_init(osl_t *osh, void *adapter)
 			printk("cannot alloc static buf!\n");
 			bcm_static_buf = NULL;
 			bcm_static_skb = NULL;
-			DHD_BUG(osh->magic != OS_HANDLE_MAGIC);
+			ASSERT(osh->magic == OS_HANDLE_MAGIC);
 			return -ENOMEM;
 		}
 
@@ -380,7 +383,7 @@ osl_detach(osl_t *osh)
 	if (osh == NULL)
 		return;
 
-	DHD_BUG(osh->magic != OS_HANDLE_MAGIC);
+	ASSERT(osh->magic == OS_HANDLE_MAGIC);
 	atomic_sub(1, &osh->cmn->refcount);
 	if (atomic_read(&osh->cmn->refcount) == 0) {
 			kfree(osh->cmn);
@@ -442,7 +445,7 @@ osl_ctfpool_add(osl_t *osh)
 		return NULL;
 
 	CTFPOOL_LOCK(osh->ctfpool, flags);
-	DHD_WARN(osh->ctfpool->curr_obj <= osh->ctfpool->max_obj, return NULL;);
+	ASSERT(osh->ctfpool->curr_obj <= osh->ctfpool->max_obj);
 
 	/* No need to allocate more objects */
 	if (osh->ctfpool->curr_obj == osh->ctfpool->max_obj) {
@@ -502,7 +505,7 @@ osl_ctfpool_init(osl_t *osh, uint numobj, uint size)
 
 	flags = CAN_SLEEP() ? GFP_KERNEL: GFP_ATOMIC;
 	osh->ctfpool = kzalloc(sizeof(ctfpool_t), flags);
-	DHD_BUG(!osh->ctfpool);
+	ASSERT(osh->ctfpool);
 
 	osh->ctfpool->max_obj = numobj;
 	osh->ctfpool->obj_size = size;
@@ -543,7 +546,7 @@ osl_ctfpool_cleanup(osl_t *osh)
 		osh->ctfpool->curr_obj--;
 	}
 
-	DHD_WARN(osh->ctfpool->curr_obj == 0,);
+	ASSERT(osh->ctfpool->curr_obj == 0);
 	osh->ctfpool->head = NULL;
 	CTFPOOL_UNLOCK(osh->ctfpool, flags);
 
@@ -570,7 +573,7 @@ osl_ctfpool_stats(osl_t *osh, void *b)
 
 	bb = b;
 
-	DHD_WARN((osh != NULL) && (bb != NULL), return;);
+	ASSERT((osh != NULL) && (bb != NULL));
 
 	bcm_bprintf(bb, "max_obj %d obj_size %d curr_obj %d refills %d\n",
 	            osh->ctfpool->max_obj, osh->ctfpool->obj_size,
@@ -596,7 +599,7 @@ osl_pktfastget(osl_t *osh, uint len)
 
 	CTFPOOL_LOCK(osh->ctfpool, flags);
 	if (osh->ctfpool->head == NULL) {
-		DHD_WARN(osh->ctfpool->curr_obj == 0,);
+		ASSERT(osh->ctfpool->curr_obj == 0);
 		osh->ctfpool->slow_allocs++;
 		CTFPOOL_UNLOCK(osh->ctfpool, flags);
 		return NULL;
@@ -604,9 +607,10 @@ osl_pktfastget(osl_t *osh, uint len)
 
 	if (len > osh->ctfpool->obj_size) {
 		CTFPOOL_UNLOCK(osh->ctfpool, flags);
-		DHD_WARN(0,);
 		return NULL;
 	}
+
+	ASSERT(len <= osh->ctfpool->obj_size);
 
 	/* Get an object from ctfpool */
 	skb = (struct sk_buff *)osh->ctfpool->head;
@@ -614,7 +618,7 @@ osl_pktfastget(osl_t *osh, uint len)
 
 	osh->ctfpool->fast_allocs++;
 	osh->ctfpool->curr_obj--;
-	DHD_WARN(CTFPOOLHEAD(osh, skb) == (struct sock *)osh->ctfpool->head,);
+	ASSERT(CTFPOOLHEAD(osh, skb) == (struct sock *)osh->ctfpool->head);
 	CTFPOOL_UNLOCK(osh->ctfpool, flags);
 
 	/* Init skb struct */
@@ -758,7 +762,7 @@ osl_pktfastfree(osl_t *osh, struct sk_buff *skb)
 #endif
 
 	ctfpool = (ctfpool_t *)CTFPOOLPTR(osh, skb);
-	DHD_WARN(ctfpool != NULL, return;);
+	ASSERT(ctfpool != NULL);
 
 	/* Add object to the ctfpool */
 	CTFPOOL_LOCK(ctfpool, flags);
@@ -768,7 +772,7 @@ osl_pktfastfree(osl_t *osh, struct sk_buff *skb)
 	ctfpool->fast_frees++;
 	ctfpool->curr_obj++;
 
-	DHD_WARN(ctfpool->curr_obj <= ctfpool->max_obj,);
+	ASSERT(ctfpool->curr_obj <= ctfpool->max_obj);
 	CTFPOOL_UNLOCK(ctfpool, flags);
 }
 #endif /* CTFPOOL */
@@ -1031,10 +1035,10 @@ osl_pci_read_config(osl_t *osh, uint offset, uint size)
 	uint val = 0;
 	uint retry = PCI_CFG_RETRY;
 
-	DHD_WARN((osh && (osh->magic == OS_HANDLE_MAGIC)), return 0;);
+	ASSERT((osh && (osh->magic == OS_HANDLE_MAGIC)));
 
 	/* only 4byte access supported */
-	DHD_BUG(size != 4);
+	ASSERT(size == 4);
 
 	do {
 		pci_read_config_dword(osh->pdev, offset, &val);
@@ -1051,10 +1055,10 @@ osl_pci_write_config(osl_t *osh, uint offset, uint size, uint val)
 {
 	uint retry = PCI_CFG_RETRY;
 
-	DHD_WARN((osh && (osh->magic == OS_HANDLE_MAGIC)), return;);
+	ASSERT((osh && (osh->magic == OS_HANDLE_MAGIC)));
 
 	/* only 4byte access supported */
-	DHD_BUG(size != 4);
+	ASSERT(size == 4);
 
 	do {
 		pci_write_config_dword(osh->pdev, offset, val);
@@ -1070,7 +1074,7 @@ osl_pci_write_config(osl_t *osh, uint offset, uint size, uint val)
 uint
 osl_pci_bus(osl_t *osh)
 {
-	DHD_WARN(osh && (osh->magic == OS_HANDLE_MAGIC) && osh->pdev, return 0;);
+	ASSERT(osh && (osh->magic == OS_HANDLE_MAGIC) && osh->pdev);
 
 #if defined(__ARM_ARCH_7A__) && LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 35)
 	return pci_domain_nr(((struct pci_dev *)osh->pdev)->bus);
@@ -1083,7 +1087,7 @@ osl_pci_bus(osl_t *osh)
 uint
 osl_pci_slot(osl_t *osh)
 {
-	DHD_WARN(osh && (osh->magic == OS_HANDLE_MAGIC) && osh->pdev, return 0;);
+	ASSERT(osh && (osh->magic == OS_HANDLE_MAGIC) && osh->pdev);
 
 #if defined(__ARM_ARCH_7A__) && LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 35)
 	return PCI_SLOT(((struct pci_dev *)osh->pdev)->devfn) + 1;
@@ -1096,7 +1100,7 @@ osl_pci_slot(osl_t *osh)
 uint
 osl_pcie_domain(osl_t *osh)
 {
-	DHD_WARN(osh && (osh->magic == OS_HANDLE_MAGIC) && osh->pdev, return 0;);
+	ASSERT(osh && (osh->magic == OS_HANDLE_MAGIC) && osh->pdev);
 
 	return pci_domain_nr(((struct pci_dev *)osh->pdev)->bus);
 }
@@ -1105,7 +1109,7 @@ osl_pcie_domain(osl_t *osh)
 uint
 osl_pcie_bus(osl_t *osh)
 {
-	DHD_WARN(osh && (osh->magic == OS_HANDLE_MAGIC) && osh->pdev, return 0;);
+	ASSERT(osh && (osh->magic == OS_HANDLE_MAGIC) && osh->pdev);
 
 	return ((struct pci_dev *)osh->pdev)->bus->number;
 }
@@ -1114,7 +1118,7 @@ osl_pcie_bus(osl_t *osh)
 struct pci_dev *
 osl_pci_device(osl_t *osh)
 {
-	DHD_WARN(osh && (osh->magic == OS_HANDLE_MAGIC) && osh->pdev, return 0;);
+	ASSERT(osh && (osh->magic == OS_HANDLE_MAGIC) && osh->pdev);
 
 	return osh->pdev;
 }
@@ -1144,7 +1148,7 @@ osl_malloc(osl_t *osh, uint size)
 
 	/* only ASSERT if osh is defined */
 	if (osh)
-		DHD_WARN(osh->magic == OS_HANDLE_MAGIC, return NULL;);
+		ASSERT(osh->magic == OS_HANDLE_MAGIC);
 #ifdef CONFIG_DHD_USE_STATIC_BUF
 	if (bcm_static_buf)
 	{
@@ -1226,7 +1230,7 @@ osl_mfree(osl_t *osh, void *addr, uint size)
 			spin_unlock_irqrestore(&bcm_static_buf->static_lock, flags);
 
 			if (osh && osh->cmn) {
-				DHD_WARN(osh->magic == OS_HANDLE_MAGIC, return;);
+				ASSERT(osh->magic == OS_HANDLE_MAGIC);
 				atomic_sub(size, &osh->cmn->malloced);
 			}
 			return;
@@ -1234,9 +1238,9 @@ osl_mfree(osl_t *osh, void *addr, uint size)
 	}
 #endif /* CONFIG_DHD_USE_STATIC_BUF */
 	if (osh && osh->cmn) {
-		DHD_WARN(osh->magic == OS_HANDLE_MAGIC, return;);
+		ASSERT(osh->magic == OS_HANDLE_MAGIC);
 
-		DHD_WARN(size <= osl_malloced(osh), return;);
+		ASSERT(size <= osl_malloced(osh));
 
 		atomic_sub(size, &osh->cmn->malloced);
 	}
@@ -1246,7 +1250,7 @@ osl_mfree(osl_t *osh, void *addr, uint size)
 uint
 osl_check_memleak(osl_t *osh)
 {
-	DHD_WARN((osh && (osh->magic == OS_HANDLE_MAGIC)), return 0;);
+	ASSERT((osh && (osh->magic == OS_HANDLE_MAGIC)));
 	if (atomic_read(&osh->cmn->refcount) == 1)
 		return (atomic_read(&osh->cmn->malloced));
 	else
@@ -1256,14 +1260,14 @@ osl_check_memleak(osl_t *osh)
 uint
 osl_malloced(osl_t *osh)
 {
-	DHD_WARN((osh && (osh->magic == OS_HANDLE_MAGIC)), return 0;);
+	ASSERT((osh && (osh->magic == OS_HANDLE_MAGIC)));
 	return (atomic_read(&osh->cmn->malloced));
 }
 
 uint
 osl_malloc_failed(osl_t *osh)
 {
-	DHD_WARN((osh && (osh->magic == OS_HANDLE_MAGIC)), return 0;);
+	ASSERT((osh && (osh->magic == OS_HANDLE_MAGIC)));
 	return (osh->failed);
 }
 
@@ -1279,7 +1283,7 @@ osl_dma_alloc_consistent(osl_t *osh, uint size, uint16 align_bits, uint *alloced
 {
 	void *va;
 	uint16 align = (1 << align_bits);
-	DHD_WARN((osh && (osh->magic == OS_HANDLE_MAGIC)), return NULL;);
+	ASSERT((osh && (osh->magic == OS_HANDLE_MAGIC)));
 
 	if (!ISALIGNED(DMA_CONSISTENT_ALIGN, align))
 		size += align;
@@ -1302,7 +1306,7 @@ osl_dma_alloc_consistent(osl_t *osh, uint size, uint16 align_bits, uint *alloced
 void
 osl_dma_free_consistent(osl_t *osh, void *va, uint size, dmaaddr_t pa)
 {
-	DHD_WARN((osh && (osh->magic == OS_HANDLE_MAGIC)), return;);
+	ASSERT((osh && (osh->magic == OS_HANDLE_MAGIC)));
 
 #if defined(USE_KMALLOC_FOR_FLOW_RING) && defined(__ARM_ARCH_7A__)
 	kfree(va);
@@ -1316,7 +1320,7 @@ osl_dma_map(osl_t *osh, void *va, uint size, int direction, void *p, hnddma_seg_
 {
 	int dir;
 
-	DHD_WARN((osh && (osh->magic == OS_HANDLE_MAGIC)), return 0;);
+	ASSERT((osh && (osh->magic == OS_HANDLE_MAGIC)));
 	dir = (direction == DMA_TX)? PCI_DMA_TODEVICE: PCI_DMA_FROMDEVICE;
 
 #if defined(__ARM_ARCH_7A__) && defined(BCMDMASGLISTOSL)
@@ -1328,11 +1332,11 @@ osl_dma_map(osl_t *osh, void *va, uint size, int direction, void *p, hnddma_seg_
 			sg = &_sg[totsegs];
 			if (skb_is_nonlinear(skb)) {
 				nsegs = skb_to_sgvec(skb, sg, 0, PKTLEN(osh, skb));
-				DHD_BUG((nsegs <= 0) || (totsegs + nsegs > MAX_DMA_SEGS));
+				ASSERT((nsegs > 0) && (totsegs + nsegs <= MAX_DMA_SEGS));
 				pci_map_sg(osh->pdev, sg, nsegs, dir);
 			} else {
 				nsegs = 1;
-				DHD_BUG(totsegs + nsegs > MAX_DMA_SEGS);
+				ASSERT(totsegs + nsegs <= MAX_DMA_SEGS);
 				sg->page_link = 0;
 				sg_set_buf(sg, PKTDATA(osh, skb), PKTLEN(osh, skb));
 				pci_map_single(osh->pdev, PKTDATA(osh, skb), PKTLEN(osh, skb), dir);
@@ -1358,7 +1362,7 @@ osl_dma_unmap(osl_t *osh, uint pa, uint size, int direction)
 {
 	int dir;
 
-	DHD_WARN((osh && (osh->magic == OS_HANDLE_MAGIC)), return;);
+	ASSERT((osh && (osh->magic == OS_HANDLE_MAGIC)));
 	dir = (direction == DMA_TX)? PCI_DMA_TODEVICE: PCI_DMA_FROMDEVICE;
 	pci_unmap_single(osh->pdev, (uint32)pa, size, dir);
 }
@@ -1457,7 +1461,7 @@ osl_pktdup(osl_t *osh, void *skb)
 {
 	void * p;
 
-	DHD_WARN(!PKTISCHAINED(skb), return NULL;);
+	ASSERT(!PKTISCHAINED(skb));
 
 	/* clear the CTFBUF flag if set and map the rest of the buffer
 	 * before cloning.
@@ -1482,7 +1486,7 @@ osl_pktdup(osl_t *osh, void *skb)
 		 * object to be alloced later.
 		 */
 		ctfpool = (ctfpool_t *)CTFPOOLPTR(osh, skb);
-		DHD_WARN(ctfpool != NULL, return NULL;);
+		ASSERT(ctfpool != NULL);
 		PKTCLRFAST(osh, p);
 		PKTCLRFAST(osh, skb);
 		ctfpool->refills++;

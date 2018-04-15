@@ -294,14 +294,15 @@ dhd_bus_t* dhdpcie_bus_attach(osl_t *osh, volatile char* regs, volatile char* tc
 uint
 dhd_bus_chip(struct dhd_bus *bus)
 {
-	DHD_WARN(bus->sih != NULL, return 0;);
+	ASSERT(bus->sih != NULL);
 	return bus->sih->chip;
 }
 
 uint
 dhd_bus_chiprev(struct dhd_bus *bus)
 {
-	DHD_BUG((bus == NULL) || (bus->sih == NULL));
+	ASSERT(bus);
+	ASSERT(bus->sih != NULL);
 	return bus->sih->chiprev;
 }
 
@@ -605,7 +606,7 @@ dhdpcie_bus_release(dhd_bus_t *bus)
 	if (bus) {
 
 		osh = bus->osh;
-		DHD_WARN(osh, return;);
+		ASSERT(osh);
 
 		if (bus->dhd) {
 			dongle_isolation = bus->dhd->dongle_isolation;
@@ -929,8 +930,7 @@ dhdpcie_download_nvram(struct dhd_bus *bus)
 
 		/* nvram is string with null terminated. cannot use strlen */
 		len = bus->nvram_params_len;
-		if (len > MAX_NVRAMBUF_SIZE)
-			goto err;
+		ASSERT(len <= MAX_NVRAMBUF_SIZE);
 		memcpy(memblock, bus->nvram_params, len);
 	}
 	if (len > 0 && len < MAX_NVRAMBUF_SIZE) {
@@ -2116,14 +2116,14 @@ dhd_bus_iovar_op(dhd_pub_t *dhdp, const char *name,
 
 	DHD_TRACE(("%s: Enter\n", __FUNCTION__));
 
-	DHD_WARN(name, return BCME_BADARG;);
-	DHD_WARN(len >= 0, return BCME_BADARG;);
+	ASSERT(name);
+	ASSERT(len >= 0);
 
 	/* Get MUST have return space */
-	DHD_WARN(set || (arg && len), return BCME_BADARG;);
+	ASSERT(set || (arg && len));
 
 	/* Set does NOT take qualifiers */
-	DHD_WARN(!set || (!params && !plen), return BCME_BADARG;);
+	ASSERT(!set || (!params && !plen));
 
 	DHD_INFO(("%s: %s %s, len %d plen %d\n", __FUNCTION__,
 	         name, (set ? "set" : "get"), len, plen));
@@ -2751,7 +2751,7 @@ dhdpcie_bus_doiovar(dhd_bus_t *bus, const bcm_iovar_t *vi, uint32 actionid, cons
 
 		bool set = (actionid == IOV_SVAL(IOV_MEMBYTES));
 
-		DHD_WARN(plen >= 2*sizeof(int), return BCME_BADARG;);
+		ASSERT(plen >= 2*sizeof(int));
 
 		address = (uint32)int_val;
 		bcopy((char *)params + sizeof(int_val), &int_val, sizeof(int_val));
@@ -4017,11 +4017,13 @@ int dhd_bus_init(dhd_pub_t *dhdp, bool enforce_mutex)
 
 	DHD_TRACE(("%s: Enter\n", __FUNCTION__));
 
-	DHD_WARN(bus->dhd, return 0;);
+	ASSERT(bus->dhd);
+	if (!bus->dhd)
+		return 0;
 
 	/* Make sure we're talking to the core. */
 	bus->reg = si_setcore(bus->sih, PCIE2_CORE_ID, 0);
-	DHD_WARN(bus->reg != NULL, return 0;);
+	ASSERT(bus->reg != NULL);
 
 	/* before opening up bus for data transfer, check if shared are is intact */
 	ret = dhdpcie_readshared(bus);
@@ -4032,7 +4034,7 @@ int dhd_bus_init(dhd_pub_t *dhdp, bool enforce_mutex)
 
 	/* Make sure we're talking to the core. */
 	bus->reg = si_setcore(bus->sih, PCIE2_CORE_ID, 0);
-	DHD_WARN(bus->reg != NULL, return 0;);
+	ASSERT(bus->reg != NULL);
 
 	/* Set bus state according to enable result */
 	dhdp->busstate = DHD_BUS_DATA;
@@ -4301,7 +4303,7 @@ void dhd_bus_clean_flow_ring(dhd_bus_t *bus, void *node)
 	while ((pkt = dhd_flow_queue_dequeue(bus->dhd, queue)) != NULL) {
 		PKTFREE(bus->dhd->osh, pkt, TRUE);
 	}
-	DHD_WARN(flow_queue_empty(queue),);
+	ASSERT(flow_queue_empty(queue));
 
 	flow_ring_node->status = FLOW_RING_STATUS_CLOSED;
 
@@ -4346,7 +4348,7 @@ dhd_bus_flow_ring_create_response(dhd_bus_t *bus, uint16 flowid, int32 status)
 	DHD_INFO(("%s :Flow Response %d \n", __FUNCTION__, flowid));
 
 	flow_ring_node = DHD_FLOW_RING(bus->dhd, flowid);
-	DHD_WARN(flow_ring_node->flowid == flowid, return;);
+	ASSERT(flow_ring_node->flowid == flowid);
 
 	if (status != BCME_OK) {
 		DHD_ERROR(("%s Flow create Response failure error status = %d \n",
@@ -4397,7 +4399,7 @@ dhd_bus_flow_ring_delete_request(dhd_bus_t *bus, void *arg)
 	while ((pkt = dhd_flow_queue_dequeue(bus->dhd, queue)) != NULL) {
 		PKTFREE(bus->dhd->osh, pkt, TRUE);
 	}
-	DHD_WARN(flow_queue_empty(queue),);
+	ASSERT(flow_queue_empty(queue));
 
 	DHD_FLOWRING_UNLOCK(flow_ring_node->lock, flags);
 
@@ -4415,7 +4417,7 @@ dhd_bus_flow_ring_delete_response(dhd_bus_t *bus, uint16 flowid, uint32 status)
 	DHD_ERROR(("%s :Flow Delete Response %d \n", __FUNCTION__, flowid));
 
 	flow_ring_node = DHD_FLOW_RING(bus->dhd, flowid);
-	DHD_WARN(flow_ring_node->flowid == flowid, return;);
+	ASSERT(flow_ring_node->flowid == flowid);
 
 	if (status != BCME_OK) {
 		DHD_ERROR(("%s Flow Delete Response failure error status = %d \n",
@@ -4453,7 +4455,7 @@ int dhd_bus_flow_ring_flush_request(dhd_bus_t *bus, void *arg)
 	while ((pkt = dhd_flow_queue_dequeue(bus->dhd, queue)) != NULL) {
 		PKTFREE(bus->dhd->osh, pkt, TRUE);
 	}
-	DHD_WARN(flow_queue_empty(queue),);
+	ASSERT(flow_queue_empty(queue));
 
 	DHD_FLOWRING_UNLOCK(flow_ring_node->lock, flags);
 
@@ -4480,7 +4482,7 @@ dhd_bus_flow_ring_flush_response(dhd_bus_t *bus, uint16 flowid, uint32 status)
 	}
 
 	flow_ring_node = DHD_FLOW_RING(bus->dhd, flowid);
-	DHD_WARN(flow_ring_node->flowid == flowid, return;);
+	ASSERT(flow_ring_node->flowid == flowid);
 
 	DHD_FLOWRING_LOCK(flow_ring_node->lock, flags);
 	flow_ring_node->status = FLOW_RING_STATUS_OPEN;
@@ -4557,7 +4559,7 @@ dhd_bus_release_dongle(struct dhd_bus *bus)
 
 	if (bus) {
 		osh = bus->osh;
-		DHD_WARN(osh, return 0;);
+		ASSERT(osh);
 
 		if (bus->dhd) {
 			dongle_isolation = bus->dhd->dongle_isolation;

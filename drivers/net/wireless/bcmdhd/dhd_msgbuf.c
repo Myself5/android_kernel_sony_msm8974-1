@@ -412,7 +412,7 @@ dhd_pktid_map_init(void *osh, uint32 num_items)
 	dhd_pktid_map_t *map;
 	uint32 dhd_pktid_map_sz;
 
-	DHD_WARN((num_items >= 1) && num_items <= MAX_PKTID_ITEMS, return NULL;);
+	ASSERT((num_items >= 1) && num_items <= MAX_PKTID_ITEMS);
 	dhd_pktid_map_sz = DHD_PKTID_MAP_SZ(num_items);
 
 	if ((map = (dhd_pktid_map_t *)MALLOC(osh, dhd_pktid_map_sz)) == NULL) {
@@ -594,12 +594,7 @@ dhd_pktid_map_reserve(dhd_pktid_map_handle_t *handle, void *pkt)
 		DHD_INFO(("%s:%d: failed, no free keys\n", __FUNCTION__, __LINE__));
 		return DHD_PKTID_INVALID; /* failed alloc request */
 	}
-
-	if(map->avail > map->items) {
-		map->failures++;
-		DHD_INFO(("%s:%d: failed, no free space\n", __FUNCTION__, __LINE__));
-		return DHD_PKTID_INVALID; /* failed alloc request */
-	}
+	ASSERT(map->avail <= map->items);
 
 	nkey = map->keys[map->avail]; /* fetch a free locker, pop stack */
 	map->avail--;
@@ -609,7 +604,7 @@ dhd_pktid_map_reserve(dhd_pktid_map_handle_t *handle, void *pkt)
 	locker->len = 0;
 	smp_wmb();
 	locker->inuse = TRUE; /* reserve this locker */
-	DHD_WARN(nkey != DHD_PKTID_INVALID,);
+	ASSERT(nkey != DHD_PKTID_INVALID);
 	return nkey; /* return locker's numbered key */
 }
 
@@ -795,11 +790,11 @@ int dhd_prot_attach(dhd_pub_t *dhd)
 	prot->retbuf.va = DMA_ALLOC_CONSISTENT(dhd->osh, IOCT_RETBUF_SIZE, DMA_ALIGN_LEN,
 		&alloced, &prot->retbuf.pa, &prot->retbuf.dmah);
 	if (prot->retbuf.va ==  NULL) {
-		DHD_WARN(0,);
+		ASSERT(0);
 		return BCME_NOMEM;
 	}
 
-	DHD_WARN(MODX((unsigned long)prot->retbuf.va, DMA_ALIGN_LEN) == 0, return BCME_ERROR;);
+	ASSERT(MODX((unsigned long)prot->retbuf.va, DMA_ALIGN_LEN) == 0);
 	bzero(prot->retbuf.va, IOCT_RETBUF_SIZE);
 	OSL_CACHE_FLUSH((void *) prot->retbuf.va, IOCT_RETBUF_SIZE);
 
@@ -808,11 +803,11 @@ int dhd_prot_attach(dhd_pub_t *dhd)
 		&alloced, &prot->ioctbuf.pa, &prot->ioctbuf.dmah);
 
 	if (prot->ioctbuf.va ==  NULL) {
-		DHD_WARN(0,);
+		ASSERT(0);
 		return BCME_NOMEM;
 	}
 
-	DHD_WARN(MODX((unsigned long)prot->ioctbuf.va, DMA_ALIGN_LEN) == 0, return BCME_ERROR;);
+	ASSERT(MODX((unsigned long)prot->ioctbuf.va, DMA_ALIGN_LEN) == 0);
 	bzero(prot->ioctbuf.va, IOCT_RETBUF_SIZE);
 	OSL_CACHE_FLUSH((void *) prot->ioctbuf.va, IOCT_RETBUF_SIZE);
 
@@ -823,10 +818,10 @@ int dhd_prot_attach(dhd_pub_t *dhd)
 		&prot->d2h_dma_scratch_buf.dmah);
 
 	if (prot->d2h_dma_scratch_buf.va == NULL) {
-		DHD_WARN(0,);
+		ASSERT(0);
 		return BCME_NOMEM;
 	}
-	DHD_WARN(MODX((unsigned long)prot->d2h_dma_scratch_buf.va, DMA_ALIGN_LEN) == 0, return BCME_ERROR;);
+	ASSERT(MODX((unsigned long)prot->d2h_dma_scratch_buf.va, DMA_ALIGN_LEN) == 0);
 	bzero(prot->d2h_dma_scratch_buf.va, DMA_D2H_SCRATCH_BUF_LEN);
 	OSL_CACHE_FLUSH((void *)prot->d2h_dma_scratch_buf.va, DMA_D2H_SCRATCH_BUF_LEN);
 
@@ -834,7 +829,7 @@ int dhd_prot_attach(dhd_pub_t *dhd)
 	/* PKTID handle INIT */
 	prot->pktid_map_handle = NATIVE_TO_PKTID_INIT(dhd->osh, MAX_PKTID_ITEMS);
 	if (prot->pktid_map_handle == NULL) {
-		DHD_WARN(0,);
+		ASSERT(0);
 		return BCME_NOMEM;
 	}
 
@@ -886,7 +881,7 @@ dhd_prot_init_index_dma_block(dhd_pub_t *dhd, uint8 type, uint32 length)
 				return BCME_NOMEM;
 			}
 
-			DHD_WARN(ISALIGNED(prot->h2d_dma_writeindx_buf.va, 4), return BCME_ERROR;);
+			ASSERT(ISALIGNED(prot->h2d_dma_writeindx_buf.va, 4));
 			bzero(prot->h2d_dma_writeindx_buf.va, dma_block_size);
 			OSL_CACHE_FLUSH((void *)prot->h2d_dma_writeindx_buf.va, dma_block_size);
 			DHD_ERROR(("H2D_WRITEINDX_ARRAY_HOST: %d-bytes "
@@ -905,7 +900,7 @@ dhd_prot_init_index_dma_block(dhd_pub_t *dhd, uint8 type, uint32 length)
 				return BCME_NOMEM;
 			}
 
-			DHD_WARN(ISALIGNED(prot->h2d_dma_readindx_buf.va, 4), return BCME_ERROR;);
+			ASSERT(ISALIGNED(prot->h2d_dma_readindx_buf.va, 4));
 			bzero(prot->h2d_dma_readindx_buf.va, dma_block_size);
 			OSL_CACHE_FLUSH((void *)prot->h2d_dma_readindx_buf.va, dma_block_size);
 			DHD_ERROR(("H2D_READINDX_ARRAY_HOST %d-bytes "
@@ -925,7 +920,7 @@ dhd_prot_init_index_dma_block(dhd_pub_t *dhd, uint8 type, uint32 length)
 				return BCME_NOMEM;
 			}
 
-			DHD_WARN(ISALIGNED(prot->d2h_dma_writeindx_buf.va, 4), return BCME_ERROR;);
+			ASSERT(ISALIGNED(prot->d2h_dma_writeindx_buf.va, 4));
 			bzero(prot->d2h_dma_writeindx_buf.va, dma_block_size);
 			OSL_CACHE_FLUSH((void *)prot->d2h_dma_writeindx_buf.va, dma_block_size);
 			DHD_ERROR(("D2H_WRITEINDX_ARRAY_HOST %d-bytes "
@@ -945,7 +940,7 @@ dhd_prot_init_index_dma_block(dhd_pub_t *dhd, uint8 type, uint32 length)
 				return BCME_NOMEM;
 			}
 
-			DHD_WARN(ISALIGNED(prot->d2h_dma_readindx_buf.va, 4), return BCME_ERROR;);
+			ASSERT(ISALIGNED(prot->d2h_dma_readindx_buf.va, 4));
 			bzero(prot->d2h_dma_readindx_buf.va, dma_block_size);
 			OSL_CACHE_FLUSH((void *)prot->d2h_dma_readindx_buf.va, dma_block_size);
 			DHD_ERROR(("D2H_READINDX_ARRAY_HOST %d-bytes "
@@ -1477,7 +1472,7 @@ dhd_prot_rxbufpost_ctrl(dhd_pub_t *dhd, bool event_buf)
 	if (PHYSADDRISZERO(physaddr)) {
 
 		DHD_ERROR(("Invalid phyaddr 0\n"));
-		DHD_WARN(0,);
+		ASSERT(0);
 		goto free_pkt_return;
 	}
 
@@ -1712,10 +1707,10 @@ dhd_prot_process_msgtype(dhd_pub_t *dhd, msgbuf_ring_t *ring, uint8* buf, uint16
 	DHD_INFO(("%s: process msgbuf of len %d\n", __FUNCTION__, len));
 
 	while (len > 0) {
-		DHD_WARN(len > (sizeof(cmn_msg_hdr_t) + prot->rx_dataoffset), return BCME_ERROR;);
+		ASSERT(len > (sizeof(cmn_msg_hdr_t) + prot->rx_dataoffset));
 		if (prot->rx_dataoffset) {
 			cur_dma_len = *(uint32 *) buf;
-			DHD_BUG(cur_dma_len > len);
+			ASSERT(cur_dma_len <= len);
 			buf += prot->rx_dataoffset;
 			len -= (uint16)prot->rx_dataoffset;
 		}
@@ -1763,9 +1758,7 @@ dhd_process_msgtype(dhd_pub_t *dhd, msgbuf_ring_t *ring, uint8* buf, uint16 len)
 	cmn_msg_hdr_t *msg = NULL;
 	int ret = BCME_OK;
 
-	if(ring == NULL || ring->ringmem == NULL)
-		return BCME_ERROR;
-
+	ASSERT(ring && ring->ringmem);
 	msglen = RING_LEN_ITEMS(ring);
 	if (msglen == 0) {
 		DHD_ERROR(("%s: ringidx %d, msglen is %d, pktlen is %d \n",
@@ -1909,7 +1902,7 @@ dhd_prot_txstatus_process(dhd_pub_t *dhd, void * buf, uint16 msglen)
 	else
 		DHD_ERROR(("Extra packets are freed\n"));
 
-	DHD_WARN(pktid != 0, return;);
+	ASSERT(pktid != 0);
 	pkt = dhd_prot_packet_get(dhd, pktid, BUFF_TYPE_DATA_TX);
 	if (pkt) {
 #ifdef DBG_PKT_MON
@@ -2189,7 +2182,7 @@ dhd_prot_txdata(dhd_pub_t *dhd, void *PKTBUF, uint8 ifidx)
 	physaddr = DMA_MAP(dhd->osh, PKTDATA(dhd->osh, PKTBUF), pktlen, DMA_TX, PKTBUF, 0);
 	if ((PHYSADDRHI(physaddr) == 0) && (PHYSADDRLO(physaddr) == 0)) {
 		DHD_ERROR(("Something really bad, unless 0 is a valid phyaddr\n"));
-		DHD_BUG(1);
+		ASSERT(0);
 	}
 
 	/* No need to lock. Save the rest of the packet's metadata */
@@ -2237,7 +2230,7 @@ dhd_prot_txdata(dhd_pub_t *dhd, void *PKTBUF, uint8 ifidx)
 			prot->tx_metadata_offset, DMA_RX, PKTBUF, 0);
 		if (PHYSADDRISZERO(meta_physaddr)) {
 			DHD_ERROR(("Something really bad, unless 0 is a valid phyaddr\n"));
-			DHD_BUG(1);
+			ASSERT(0);
 		}
 
 		/* Adjust the data pointer back to original value */
@@ -2362,10 +2355,10 @@ int dhd_prot_ioctl(dhd_pub_t *dhd, int ifidx, wl_ioctl_t * ioc, void * buf, int 
 
 	DHD_TRACE(("%s: Enter\n", __FUNCTION__));
 
-	if (len > WLC_IOCTL_MAXLEN) {
-		ret = BCME_BADARG;
+	ASSERT(len <= WLC_IOCTL_MAXLEN);
+
+	if (len > WLC_IOCTL_MAXLEN)
 		goto done;
-	}
 
 	if (prot->pending == TRUE) {
 		DHD_ERROR(("packet is pending!!!! cmd=0x%x (%lu) lastcmd=0x%x (%lu)\n",
@@ -3046,13 +3039,13 @@ prot_ring_attach(dhd_prot_t * prot, char* name, uint16 max_item, uint16 len_item
 	uint16 size, cnt;
 	uint32 *marker;
 
-	DHD_WARN(name, return NULL;);
+	ASSERT(name);
 	BCM_REFERENCE(physaddr);
 
 	/* allocate ring info */
 	ring = MALLOC(prot->osh, sizeof(msgbuf_ring_t));
 	if (ring == NULL) {
-		DHD_WARN(0,);
+		ASSERT(0);
 		return NULL;
 	}
 	bzero(ring, sizeof(*ring));
@@ -3082,7 +3075,7 @@ prot_ring_attach(dhd_prot_t * prot, char* name, uint16 max_item, uint16 len_item
 	ring->ringmem->base_addr.high_addr = htol32(PHYSADDRHI(ring->ring_base.pa));
 	ring->ringmem->base_addr.low_addr = htol32(PHYSADDRLO(ring->ring_base.pa));
 
-	DHD_WARN(MODX((unsigned long)ring->ring_base.va, DMA_ALIGN_LEN) == 0, goto fail;);
+	ASSERT(MODX((unsigned long)ring->ring_base.va, DMA_ALIGN_LEN) == 0);
 	bzero(ring->ring_base.va, size);
 	for (cnt = 0; cnt < max_item; cnt++) {
 		marker = (uint32 *)ring->ring_base.va +
@@ -3113,7 +3106,7 @@ fail:
 	if (ring->ringmem)
 		MFREE(prot->osh, ring->ringmem, sizeof(ring_mem_t));
 	MFREE(prot->osh, ring, sizeof(msgbuf_ring_t));
-	DHD_WARN(0,);
+	ASSERT(0);
 	return NULL;
 }
 static void
@@ -3179,8 +3172,7 @@ prot_get_ring_space(msgbuf_ring_t *ring, uint16 nitems, uint16 * alloced)
 	void *ret_ptr = NULL;
 	uint16 ring_avail_cnt;
 
-	if(nitems > RING_MAX_ITEM(ring))
-		return NULL;
+	ASSERT(nitems <= RING_MAX_ITEM(ring));
 
 	ring_avail_cnt = CHECK_WRITE_SPACE(RING_READ_PTR(ring), RING_WRITE_PTR(ring),
 		RING_MAX_ITEM(ring));
@@ -3204,7 +3196,7 @@ prot_get_ring_space(msgbuf_ring_t *ring, uint16 nitems, uint16 * alloced)
 		RING_WRITE_PTR(ring) += *alloced;
 	else {
 		/* Should never hit this */
-		DHD_BUG(1);
+		ASSERT(0);
 		return NULL;
 	}
 
@@ -3410,6 +3402,7 @@ prot_get_src_addr(dhd_pub_t *dhd, msgbuf_ring_t * ring, uint16* available_len)
 		return NULL;
 	}
 
+	ASSERT(items <= ring->ringmem->max_item);
 	if (items > ring->ringmem->max_item) {
 		DHD_ERROR(("%s: ring:%p, ring->name:%s, items:%d\n", __FUNCTION__,
 			ring, ring->name, items));
